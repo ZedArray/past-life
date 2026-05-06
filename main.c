@@ -1,4 +1,9 @@
 #include <stdio.h>
+#include <Windows.h>
+#include <stdlib.h>
+#include <time.h>
+
+int roll;
 
 typedef enum States {
     NONE,
@@ -51,41 +56,92 @@ char* getName(States state) {
     }
 }
 
-void boot_state(fsm state) {
-    printf("Entering %s state, leaving %s state\n", getName(state.currState), getName(state.prevState));
+void change_state(fsm *state, States nextState) {
+    Sleep(2000);
+    state->prevState = state->currState;
+    state->currState = nextState;
+    printf("Entering %s state, leaving %s state\n", getName(state->currState), getName(state->prevState));
 }
-void idle_state();
-void nominal_state();
-void lp_state();
-void fault_state();
-void safe_state();
 
-void state_loop(fsm state) {
-    // while (state.currState != NONE) {
-        switch (state.currState)
+
+void boot_state(fsm *state) {
+    printf("Currently on %s state\n", getName(state->currState));
+    change_state(state, IDLE);
+}
+void idle_state(fsm *state) {
+    printf("Currently on %s state\n", getName(state->currState));
+
+    if (roll > 10 || state->prevState == LOW_POWER) {
+        change_state(state, NOMINAL);
+    }
+    else {
+        change_state(state, LOW_POWER);
+    }
+}
+void nominal_state(fsm *state) {
+    printf("Payload and Sensor activites activated\n");
+
+    if (roll >= 13) {
+        // printf("Success\n");
+        change_state(state, IDLE);
+    }
+    else if (roll <= 6) {
+        // printf("Something broke\n");
+        change_state(state, FAULT);
+    }
+}
+void lp_state(fsm *state) {
+    printf("Low Power Mode\n");
+
+    if (roll < 10) {
+        // printf("New task received\n");
+        change_state(state, IDLE);
+    }
+}
+void fault_state(fsm *state) {
+    printf("AAAAAAAAAAAAAAA\n");
+
+    if (roll > 12) {
+        change_state(state, SAFE);
+    }
+}
+void safe_state(fsm *state) {
+    printf("Recovery Mode\n");
+    
+    if (roll > 12) {
+        change_state(state, IDLE);
+    }
+}
+
+void state_loop(fsm *state) {
+    while (state->currState != NONE) {
+        Sleep(2000);
+        srand(time(NULL));
+        roll = rand() % 20 + 1;
+        switch (state->currState)
         {
         case BOOT:
             boot_state(state);
             break;
 
         case IDLE:
-            printf("Current state is IDLE\n");
+            idle_state(state);
             break;
 
         case NOMINAL:
-            printf("Current state is NOMINAL\n");
+            nominal_state(state);
             break;
 
         case LOW_POWER:
-            printf("Current state is LOW_POWER\n");
+            lp_state(state);
             break;
 
         case FAULT:
-            printf("Current state is FAULT\n");
+            fault_state(state);
             break;
 
         case SAFE:
-            printf("Current state is SAFE\n");
+            safe_state(state);
             break;
             
         default:
@@ -101,7 +157,7 @@ void state_loop(fsm state) {
         //     printf("Cannot go back to BOOT state. Moving into IDLE state\n");
         //     state = 1;
         // }
-    // }
+    }
 }
 
 int main() {
@@ -109,9 +165,7 @@ int main() {
 
     state.currState = BOOT;
     state.prevState = NONE;
-    // printf("%d\n", state.currState);
-    // printf("%d\n", state.prevState);
-    state_loop(state);
+    state_loop(&state);
 
     return 0;
 }
